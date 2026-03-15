@@ -4,7 +4,7 @@ only for windows
 ### Commands
 * **``/help`` - all commands**
 * **``/scr`` - takes a screenshot of the entire screen**
-* **``/run`` - runs command from cmd**
+* **``/cmd`` - runs command from cmd**
 * **``/write`` - entrys any text**
 * **``/key`` - presses any keys, for example: `f12` or `shift`**
 * **``/ct_notify`` - dialog window based on `ctypes`**
@@ -13,9 +13,7 @@ only for windows
 * **``/pinfo`` - information about all active windows**
 * **``/clipb`` - getting any text from clipboard**
 * **``/web`` - opening any urls**
-* **``/moff`` - disabling monitor**
-* **``/mon`` - enabling monitor**
-* **``/mlock`` - blocking monitor (`Win+L`)**
+* **``/mon`` - off, on and lock display. arguments: `off` `on` `lock`**
 * **``/wkill`` - killing active window**
 * **``/shutdown`` - have 2 arg: `r (reboot)` and `s (shutdown)`. this command can shutdown and reboot your pc**
 * **``/pscan`` - scanning all ports in `local ip`**
