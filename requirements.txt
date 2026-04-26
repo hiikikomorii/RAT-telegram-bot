@@ -1,7 +1,7 @@
-pyTelegramBotAPI
+aiogram>=3.4.1
+opencv-python
 pyautogui
 pynput
 plyer
 psutil
-pillow
-
+requests
