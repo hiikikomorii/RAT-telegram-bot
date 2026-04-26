@@ -20,7 +20,7 @@ only for windows
 * **``/bsod`` - calling BLue Screen Of Death / [BSOD ](https://i.ytimg.com/vi/Rom6IUmQj-4/maxresdefault.jpg?sqp=-oaymwEmCIAKENAF8quKqQMa8AEB-AH2CIAC0AWKAgwIABABGBMgTih_MA8=&amp;rs=AOn4CLDyJNckGfEAcydWc5y7qjuU_ygd5A)**
 ***
 ### Usage
-1. **Set your `_TOKEN_` and `_ADMIN_ID_` in the script**
+1. **open `user.json` and set your `account id` and `bot token`**
 2. **Install requests. move to the location where the located ``requirements.txt`` and install pip from this list:**
    ```
    pip install -r requirements.txt
@@ -33,7 +33,7 @@ only for windows
 
 ***
 ### Security
-* **Only the ``_ADMIN_ID_`` can execute commands**
+* **Only the ``ADMIN_ID`` can execute commands**
 * **Keep your ``TOKEN`` private**
 * **Bot will notify you if another user tries to press ``/start`` command**
 
